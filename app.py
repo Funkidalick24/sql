@@ -1,10 +1,12 @@
 import streamlit as st
 import pandas as pd
+from datetime import datetime
 from student_records import (
     create_tables, add_student, get_students, update_student, delete_student,
     add_attendance, get_attendance, update_attendance, delete_attendance,
     get_students_with_attendance, get_attendance_summary, get_average_grade,
-    get_attendance_by_date_range, seed_data
+    get_attendance_by_date_range, seed_data, get_attendance_by_date,
+    delete_attendance_by_student_date
 )
 
 # Initialize database
@@ -72,59 +74,178 @@ if page == "Students":
 elif page == "Attendance":
     st.header("📅 Attendance Management")
 
-    # Display current attendance
-    st.subheader("Current Attendance Records")
-    attendance = get_attendance()
-    if attendance:
-        df_attendance = pd.DataFrame(attendance, columns=["ID", "Student ID", "Date", "Status"])
-        st.dataframe(df_attendance, use_container_width=True)
-    else:
-        st.info("No attendance records found. Add some below!")
-
-    # Get students for dropdown
+    # Get students for attendance recording
     students = get_students()
     if not students:
         st.warning("Please add students first before managing attendance.")
     else:
-        student_options = {f"{s[0]} - {s[1]}": s[0] for s in students}
+        # Select date for attendance
+        selected_date = st.date_input("Select Date for Attendance", value=datetime.today().date())
+        date_str = str(selected_date)
 
-        # Add attendance
-        st.subheader("Add Attendance Record")
-        with st.form("add_attendance_form"):
-            selected_student = st.selectbox("Select Student", list(student_options.keys()))
-            date = st.date_input("Date")
-            status = st.selectbox("Status", ["Present", "Absent"])
-            add_submitted = st.form_submit_button("Add Attendance")
-            if add_submitted and selected_student:
-                student_id = student_options[selected_student]
-                add_attendance(student_id, str(date), status)
-                st.success("Attendance record added successfully!")
+        # Get existing attendance for the selected date
+        existing_attendance = get_attendance_by_date(date_str)
+
+        # Display attendance table for the selected date
+        st.subheader(f"Attendance for {selected_date}")
+
+        # Create a list of students with their attendance status
+        attendance_data = []
+        for student in students:
+            student_id, name, grade = student
+            status = existing_attendance.get(student_id, "Not Recorded")
+            attendance_data.append({
+                "Student ID": student_id,
+                "Name": name,
+                "Grade": grade,
+                "Status": status
+            })
+
+        df_attendance = pd.DataFrame(attendance_data)
+        st.dataframe(df_attendance, use_container_width=True)
+
+        # Quick attendance recording
+        st.subheader("Quick Attendance Recording")
+
+        # Create columns for each student
+        cols = st.columns(min(len(students), 4))  # Max 4 columns for better layout
+
+        for i, student in enumerate(students):
+            col_idx = i % len(cols)
+            with cols[col_idx]:
+                student_id, name, grade = student
+                current_status = existing_attendance.get(student_id, "Not Recorded")
+
+                # Use radio buttons for quick selection
+                status_options = ["Not Recorded", "Present", "Absent"]
+                selected_status = st.radio(
+                    f"{name} (ID: {student_id})",
+                    status_options,
+                    index=status_options.index(current_status) if current_status in status_options else 0,
+                    key=f"attendance_{student_id}_{date_str}"
+                )
+
+                # Record attendance if changed
+                if selected_status != "Not Recorded" and selected_status != current_status:
+                    if current_status != "Not Recorded":
+                        # Update existing record
+                        # We need to find the attendance ID for this student and date
+                        attendance_records = get_attendance()
+                        attendance_id = None
+                        for record in attendance_records:
+                            if record[1] == student_id and record[2] == date_str:
+                                attendance_id = record[0]
+                                break
+                        if attendance_id:
+                            update_attendance(attendance_id, selected_status)
+                    else:
+                        # Add new record
+                        add_attendance(student_id, date_str, selected_status)
+                    st.success(f"Attendance for {name} updated to {selected_status}!")
+                    st.rerun()
+
+        # Bulk actions
+        st.subheader("Bulk Actions")
+        col1, col2, col3 = st.columns(3)
+
+        with col1:
+            if st.button("Mark All Present"):
+                for student in students:
+                    student_id = student[0]
+                    if existing_attendance.get(student_id) != "Present":
+                        if student_id in existing_attendance:
+                            # Update existing
+                            attendance_records = get_attendance()
+                            attendance_id = None
+                            for record in attendance_records:
+                                if record[1] == student_id and record[2] == date_str:
+                                    attendance_id = record[0]
+                                    break
+                            if attendance_id:
+                                update_attendance(attendance_id, "Present")
+                        else:
+                            add_attendance(student_id, date_str, "Present")
+                st.success("All students marked as Present!")
                 st.rerun()
 
-        # Update attendance
-        st.subheader("Update Attendance Record")
-        if attendance:
-            attendance_options = {f"ID {a[0]} - Student {a[1]} - {a[2]} ({a[3]})": a[0] for a in attendance}
-            selected_attendance = st.selectbox("Select Attendance to Update", list(attendance_options.keys()))
-            if selected_attendance:
-                attendance_id = attendance_options[selected_attendance]
-                with st.form(f"update_attendance_form_{attendance_id}"):
-                    new_status = st.selectbox("New Status", ["Present", "Absent"])
-                    update_submitted = st.form_submit_button("Update Attendance")
-                    if update_submitted:
-                        update_attendance(attendance_id, new_status)
-                        st.success("Attendance updated successfully!")
-                        st.rerun()
-
-        # Delete attendance
-        st.subheader("Delete Attendance Record")
-        if attendance:
-            delete_options = {f"ID {a[0]} - Student {a[1]} - {a[2]} ({a[3]})": a[0] for a in attendance}
-            selected_delete = st.selectbox("Select Attendance to Delete", list(delete_options.keys()))
-            if selected_delete and st.button("Delete Attendance"):
-                delete_attendance(delete_options[selected_delete])
-                st.success("Attendance record deleted successfully!")
+        with col2:
+            if st.button("Mark All Absent"):
+                for student in students:
+                    student_id = student[0]
+                    if existing_attendance.get(student_id) != "Absent":
+                        if student_id in existing_attendance:
+                            # Update existing
+                            attendance_records = get_attendance()
+                            attendance_id = None
+                            for record in attendance_records:
+                                if record[1] == student_id and record[2] == date_str:
+                                    attendance_id = record[0]
+                                    break
+                            if attendance_id:
+                                update_attendance(attendance_id, "Absent")
+                        else:
+                            add_attendance(student_id, date_str, "Absent")
+                st.success("All students marked as Absent!")
                 st.rerun()
+
+        with col3:
+            if st.button("Clear All for Today"):
+                for student in students:
+                    student_id = student[0]
+                    if student_id in existing_attendance:
+                        delete_attendance_by_student_date(student_id, date_str)
+                st.success("All attendance records for today cleared!")
+                st.rerun()
+
+        # Individual record management (advanced)
+        with st.expander("Advanced: Individual Record Management"):
+            # Display current attendance
+            st.subheader("Current Attendance Records")
+            attendance = get_attendance()
+            if attendance:
+                df_attendance = pd.DataFrame(attendance, columns=["ID", "Student ID", "Date", "Status"])
+                st.dataframe(df_attendance, use_container_width=True)
+            else:
+                st.info("No attendance records found.")
+
+            # Add attendance
+            st.subheader("Add Attendance Record")
+            with st.form("add_attendance_form"):
+                student_options = {f"{s[0]} - {s[1]}": s[0] for s in students}
+                selected_student = st.selectbox("Select Student", list(student_options.keys()))
+                date = st.date_input("Date")
+                status = st.selectbox("Status", ["Present", "Absent"])
+                add_submitted = st.form_submit_button("Add Attendance")
+                if add_submitted and selected_student:
+                    student_id = student_options[selected_student]
+                    add_attendance(student_id, str(date), status)
+                    st.success("Attendance record added successfully!")
+                    st.rerun()
+
+            # Update attendance
+            st.subheader("Update Attendance Record")
+            if attendance:
+                attendance_options = {f"ID {a[0]} - Student {a[1]} - {a[2]} ({a[3]})": a[0] for a in attendance}
+                selected_attendance = st.selectbox("Select Attendance to Update", list(attendance_options.keys()))
+                if selected_attendance:
+                    attendance_id = attendance_options[selected_attendance]
+                    with st.form(f"update_attendance_form_{attendance_id}"):
+                        new_status = st.selectbox("New Status", ["Present", "Absent"])
+                        update_submitted = st.form_submit_button("Update Attendance")
+                        if update_submitted:
+                            update_attendance(attendance_id, new_status)
+                            st.success("Attendance updated successfully!")
+                            st.rerun()
+
+            # Delete attendance
+            st.subheader("Delete Attendance Record")
+            if attendance:
+                delete_options = {f"ID {a[0]} - Student {a[1]} - {a[2]} ({a[3]})": a[0] for a in attendance}
+                selected_delete = st.selectbox("Select Attendance to Delete", list(delete_options.keys()))
+                if selected_delete and st.button("Delete Attendance"):
+                    delete_attendance(delete_options[selected_delete])
+                    st.success("Attendance record deleted successfully!")
+                    st.rerun()
 
 elif page == "Reports":
     st.header("📊 Reports & Summaries")

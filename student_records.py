@@ -145,6 +145,22 @@ def get_attendance_by_date_range(start_date, end_date):
     records = cursor.fetchall()
     conn.close()
     return records
+def get_attendance_by_date(date):
+    """Get attendance records for a specific date as a dict of student_id: status."""
+    conn = sqlite3.connect(DB_FILE)
+    cursor = conn.cursor()
+    cursor.execute('SELECT student_id, status FROM attendance WHERE date = ?', (date,))
+    records = cursor.fetchall()
+    conn.close()
+    return {sid: status for sid, status in records}
+
+def delete_attendance_by_student_date(student_id, date):
+    """Delete attendance record for a specific student and date."""
+    conn = sqlite3.connect(DB_FILE)
+    cursor = conn.cursor()
+    cursor.execute('DELETE FROM attendance WHERE student_id = ? AND date = ?', (student_id, date))
+    conn.commit()
+    conn.close()
 
 def seed_data():
     """Add example data."""
