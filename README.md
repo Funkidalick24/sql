@@ -1,129 +1,38 @@
-# Student Records Management System
+# Overview
 
-A Python-based Student Records Management System using SQLite for relational database management. This system demonstrates full CRUD operations, JOIN queries, aggregate functions, and date-based filtering as part of the CSE 310 Applied Programming module on SQL Relational Databases.
+As a software engineer, I developed this Student Records Management System to deepen my understanding of relational databases and full-stack application development. The software is a comprehensive Python application that integrates with an SQLite relational database to manage student information and attendance records. It provides both a command-line interface for direct interaction and a web-based GUI built with Streamlit, allowing users to perform CRUD operations, execute JOIN queries, calculate aggregates, and filter data by dates.
 
-## Features
+To use the program, run the CLI with `python student_records.py` for interactive menus, or launch the web GUI with `streamlit run app.py` for a browser-based interface. The CLI offers options to add, view, update, and delete students and attendance, view joined data, get summaries, and filter by dates. The web app provides intuitive pages for students, attendance, reports, and seeding data.
 
-- **Student Management**: Add, view, update, and delete student records (name and grade).
-- **Attendance Tracking**: Record and manage attendance for students with dates and status.
-- **JOIN Queries**: View students along with their attendance records.
-- **Aggregate Functions**: Summarize attendance counts and calculate average grades.
-- **Date Filtering**: Filter attendance records by date ranges.
-- **Command-Line Interface**: Interactive CLI for all operations.
-- **Demo Mode**: Run a demonstration of all features without user input.
+My purpose in writing this software was to advance my skills in database design, SQL query construction, and integrating databases with Python applications, while building a practical tool that demonstrates real-world database operations.
 
-## Requirements
+[Software Demo Video](http://youtube.link.goes.here)
 
-- Python 3.x
-- SQLite (built-in with Python)
+# Relational Database
 
-## Installation
+The relational database used is SQLite, a lightweight, file-based SQL database engine that is built into Python, making it ideal for development and small-scale applications without requiring a separate database server.
 
-1. Ensure Python 3.x is installed on your system.
-2. Install dependencies (if any):
+The database consists of two main tables:
 
-```bash
-pip install -r requirements.txt
-```
+- **Students Table**: Stores student information with columns for id (primary key, auto-increment), name (text, not null), and grade (real number).
+- **Attendance Table**: Tracks attendance records with columns for id (primary key, auto-increment), student_id (foreign key referencing students.id), date (text in ISO format YYYY-MM-DD), and status (text, e.g., 'Present' or 'Absent').
 
-3. Download or clone the repository containing `student_records.py`.
+These tables are linked via a foreign key relationship, enabling JOIN operations to combine student data with their attendance history.
 
-## Installation
+# Development Environment
 
-1. Ensure Python 3.x is installed on your system.
-2. Download or clone the repository containing `student_records.py`.
+I used Visual Studio Code as my primary code editor for writing and debugging the Python code. The development environment included Python 3.x as the programming language, with the built-in sqlite3 module for database operations. For the web GUI, I utilized Streamlit as the framework, along with pandas for data manipulation and display in tabular formats.
 
-## Usage
+# Useful Websites
 
-### Running the Interactive CLI
+- [Python Official Documentation](https://docs.python.org/3/)
+- [SQLite Documentation](https://www.sqlite.org/docs.html)
+- [Streamlit Documentation](https://docs.streamlit.io/)
+- [Pandas Documentation](https://pandas.pydata.org/docs/)
 
-```bash
-python student_records.py
-```
+# Future Work
 
-This launches the command-line interface where you can:
-- Add/view/update/delete students
-- Add/view/update/delete attendance records
-- View joined student-attendance data
-- Get attendance summaries and average grades
-- Filter attendance by date ranges
-- Seed example data
-
-### Running the Demo
-
-```bash
-python student_records.py demo
-```
-
-This runs a complete demonstration of the system, seeding data and displaying all features.
-
-### Running the Web GUI (Streamlit)
-
-```bash
-streamlit run app.py
-```
-
-This launches a web-based graphical user interface in your browser with:
-- **Students Page**: Manage student records (add, view, update, delete)
-- **Attendance Page**: Manage attendance records with student selection
-- **Reports Page**: View summaries, joined data, and date-filtered reports
-- **Seed Data Page**: Add example data for testing
-
-The web app provides a modern, user-friendly interface while using the same underlying database and functions.
-
-## Database Schema
-
-### Students Table
-- `id` (INTEGER PRIMARY KEY AUTOINCREMENT)
-- `name` (TEXT NOT NULL)
-- `grade` (REAL)
-
-### Attendance Table
-- `id` (INTEGER PRIMARY KEY AUTOINCREMENT)
-- `student_id` (INTEGER NOT NULL, FOREIGN KEY to students.id)
-- `date` (TEXT NOT NULL, ISO format YYYY-MM-DD)
-- `status` (TEXT NOT NULL, e.g., 'Present', 'Absent')
-
-## Module Requirements Met
-
-- **Relational Database**: Uses SQLite with proper table relationships.
-- **CRUD Operations**: Full create, read, update, delete for both tables.
-- **SQL Queries**: Programmatically builds and executes queries in Python.
-- **JOINs**: Demonstrates LEFT JOIN between students and attendance.
-- **Aggregates**: Uses COUNT and AVG functions for summaries.
-- **Date Handling**: Stores dates in ISO format and filters by date ranges.
-- **Example Data**: Includes seeded data to showcase functionality.
-- **Extensibility**: Designed for future GUI or web interface integration.
-
-## Development Schedule
-
-The system was developed over two weeks following a structured sprint plan:
-
-### Week 1
-- Research relational databases and Python-SQLite integration
-- Plan database schema and program structure
-- Set up environment and create tables
-- Implement student CRUD operations
-- Implement attendance functionality
-
-### Week 2
-- Test CRUD operations
-- Implement JOIN queries and aggregates
-- Add date-based filtering
-- Integrate full workflow
-- Seed data and create CLI demo
-- Debug and refine
-
-## Risks and Mitigation
-
-1. **Limited SQL Experience**: Mitigated through tutorials, isolated testing, and seeking help.
-2. **Debugging Integration**: Used parameterized queries, individual testing, and code comments.
-3. **Time Management**: Followed strict schedule, broke tasks into daily steps, tracked progress.
-
-## Future Enhancements
-
-- Web-based GUI using Flask or Django
-- Mobile app interface
-- Advanced reporting and analytics
-- User authentication and permissions
-- Data export/import functionality
+- Implement user authentication and role-based permissions for secure access
+- Add data export/import functionality (CSV, JSON formats)
+- Add email notifications for attendance alerts
+- Implement data backup and recovery features
