@@ -6,7 +6,7 @@ To use the program, run the CLI with `python student_records.py` for interactive
 
 My purpose in writing this software was to advance my skills in database design, SQL query construction, and integrating databases with Python applications, while building a practical tool that demonstrates real-world database operations.
 
-[Software Demo Video](http://youtube.link.goes.here)
+[Software Demo Video](https://youtu.be/XWLny7JhmW0)
 
 # Relational Database
 
