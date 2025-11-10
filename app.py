@@ -79,16 +79,26 @@ elif page == "Attendance":
     if not students:
         st.warning("Please add students first before managing attendance.")
     else:
-        # Default to last 7 days ending today
+        # Default to last 5 weekdays ending today (excluding weekends)
         today = datetime.today().date()
-        default_start = today - pd.Timedelta(days=6)  # 7 days back including today
+        weekdays = []
+        current_date = today
+
+        # Go backwards from today, collecting weekdays only
+        while len(weekdays) < 5:
+            if current_date.weekday() < 5:  # Monday=0, Tuesday=1, ..., Friday=4
+                weekdays.append(current_date)
+            current_date -= pd.Timedelta(days=1)
+
+        default_start = weekdays[-1]  # Last (earliest) weekday
+        default_end = weekdays[0]     # Today (or last weekday)
 
         # Date range selection for matrix view
         col1, col2 = st.columns(2)
         with col1:
             start_date = st.date_input("Start Date", value=default_start)
         with col2:
-            end_date = st.date_input("End Date", value=today)
+            end_date = st.date_input("End Date", value=default_end)
 
         if start_date > end_date:
             st.error("Start date cannot be after end date.")
