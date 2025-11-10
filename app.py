@@ -79,12 +79,16 @@ elif page == "Attendance":
     if not students:
         st.warning("Please add students first before managing attendance.")
     else:
+        # Default to last 7 days ending today
+        today = datetime.today().date()
+        default_start = today - pd.Timedelta(days=6)  # 7 days back including today
+
         # Date range selection for matrix view
         col1, col2 = st.columns(2)
         with col1:
-            start_date = st.date_input("Start Date", value=datetime.today().date())
+            start_date = st.date_input("Start Date", value=default_start)
         with col2:
-            end_date = st.date_input("End Date", value=datetime.today().date())
+            end_date = st.date_input("End Date", value=today)
 
         if start_date > end_date:
             st.error("Start date cannot be after end date.")
