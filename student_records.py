@@ -145,6 +145,45 @@ def get_attendance_by_date_range(start_date, end_date):
     records = cursor.fetchall()
     conn.close()
     return records
+def get_attendance_matrix(start_date, end_date):
+    """Get attendance matrix for date range as dict of {student_id: {date: status}}."""
+    conn = sqlite3.connect(DB_FILE)
+    cursor = conn.cursor()
+    cursor.execute('''
+        SELECT student_id, date, status
+        FROM attendance
+        WHERE date BETWEEN ? AND ?
+        ORDER BY student_id, date
+    ''', (start_date, end_date))
+    records = cursor.fetchall()
+    conn.close()
+
+    matrix = {}
+    for student_id, date, status in records:
+        if student_id not in matrix:
+            matrix[student_id] = {}
+        matrix[student_id][date] = status
+    return matrix
+
+def update_attendance_matrix(attendance_data):
+    """Update multiple attendance records. attendance_data is dict of {student_id: {date: status}}."""
+    conn = sqlite3.connect(DB_FILE)
+    cursor = conn.cursor()
+
+    for student_id, dates in attendance_data.items():
+        for date, status in dates.items():
+            # Check if record exists
+            cursor.execute('SELECT id FROM attendance WHERE student_id = ? AND date = ?', (student_id, date))
+            existing = cursor.fetchone()
+            if existing:
+                cursor.execute('UPDATE attendance SET status = ? WHERE student_id = ? AND date = ?',
+                             (status, student_id, date))
+            else:
+                cursor.execute('INSERT INTO attendance (student_id, date, status) VALUES (?, ?, ?)',
+                             (student_id, date, status))
+
+    conn.commit()
+    conn.close()
 def get_attendance_by_date(date):
     """Get attendance records for a specific date as a dict of student_id: status."""
     conn = sqlite3.connect(DB_FILE)

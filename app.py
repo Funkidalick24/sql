@@ -6,7 +6,7 @@ from student_records import (
     add_attendance, get_attendance, update_attendance, delete_attendance,
     get_students_with_attendance, get_attendance_summary, get_average_grade,
     get_attendance_by_date_range, seed_data, get_attendance_by_date,
-    delete_attendance_by_student_date
+    delete_attendance_by_student_date, get_attendance_matrix, update_attendance_matrix
 )
 
 # Initialize database
@@ -79,123 +79,150 @@ elif page == "Attendance":
     if not students:
         st.warning("Please add students first before managing attendance.")
     else:
-        # Select date for attendance
-        selected_date = st.date_input("Select Date for Attendance", value=datetime.today().date())
-        date_str = str(selected_date)
+        # Date range selection for matrix view
+        col1, col2 = st.columns(2)
+        with col1:
+            start_date = st.date_input("Start Date", value=datetime.today().date())
+        with col2:
+            end_date = st.date_input("End Date", value=datetime.today().date())
 
-        # Get existing attendance for the selected date
-        existing_attendance = get_attendance_by_date(date_str)
+        if start_date > end_date:
+            st.error("Start date cannot be after end date.")
+        else:
+            # Get attendance matrix
+            attendance_matrix = get_attendance_matrix(str(start_date), str(end_date))
 
-        # Display attendance table for the selected date
-        st.subheader(f"Attendance for {selected_date}")
+            # Create date range
+            date_range = pd.date_range(start=start_date, end=end_date).strftime('%Y-%m-%d').tolist()
 
-        # Create a list of students with their attendance status
-        attendance_data = []
-        for student in students:
-            student_id, name, grade = student
-            status = existing_attendance.get(student_id, "Not Recorded")
-            attendance_data.append({
-                "Student ID": student_id,
-                "Name": name,
-                "Grade": grade,
-                "Status": status
-            })
+            # Create attendance table with checkboxes
+            st.subheader(f"Attendance Matrix ({start_date} to {end_date})")
 
-        df_attendance = pd.DataFrame(attendance_data)
-        st.dataframe(df_attendance, use_container_width=True)
-
-        # Quick attendance recording
-        st.subheader("Quick Attendance Recording")
-
-        # Create columns for each student
-        cols = st.columns(min(len(students), 4))  # Max 4 columns for better layout
-
-        for i, student in enumerate(students):
-            col_idx = i % len(cols)
-            with cols[col_idx]:
+            # Prepare data for display
+            table_data = []
+            for student in students:
                 student_id, name, grade = student
-                current_status = existing_attendance.get(student_id, "Not Recorded")
+                row = {"Student": name, "ID": student_id, "Grade": grade}
+                for date in date_range:
+                    status = attendance_matrix.get(student_id, {}).get(date, "Not Recorded")
+                    row[date] = status
+                table_data.append(row)
 
-                # Use radio buttons for quick selection
-                status_options = ["Not Recorded", "Present", "Absent"]
-                selected_status = st.radio(
-                    f"{name} (ID: {student_id})",
-                    status_options,
-                    index=status_options.index(current_status) if current_status in status_options else 0,
-                    key=f"attendance_{student_id}_{date_str}"
-                )
+            df = pd.DataFrame(table_data)
 
-                # Record attendance if changed
-                if selected_status != "Not Recorded" and selected_status != current_status:
-                    if current_status != "Not Recorded":
-                        # Update existing record
-                        # We need to find the attendance ID for this student and date
-                        attendance_records = get_attendance()
-                        attendance_id = None
-                        for record in attendance_records:
-                            if record[1] == student_id and record[2] == date_str:
-                                attendance_id = record[0]
-                                break
-                        if attendance_id:
-                            update_attendance(attendance_id, selected_status)
-                    else:
-                        # Add new record
-                        add_attendance(student_id, date_str, selected_status)
-                    st.success(f"Attendance for {name} updated to {selected_status}!")
+            # Display the table with checkboxes for editing
+            edited_df = st.data_editor(
+                df,
+                column_config={
+                    "Student": st.column_config.TextColumn("Student", disabled=True),
+                    "ID": st.column_config.NumberColumn("ID", disabled=True),
+                    "Grade": st.column_config.NumberColumn("Grade", disabled=True),
+                    **{date: st.column_config.SelectboxColumn(
+                        date,
+                        options=["Not Recorded", "Present", "Absent"],
+                        required=False
+                    ) for date in date_range}
+                },
+                use_container_width=True,
+                num_rows="fixed"
+            )
+
+            # Save changes button
+            if st.button("💾 Save Attendance Changes", type="primary"):
+                changes_made = False
+                attendance_updates = {}
+
+                for idx, row in edited_df.iterrows():
+                    student_id = int(row["ID"])
+                    student_name = row["Student"]
+
+                    for date in date_range:
+                        new_status = row[date]
+                        old_status = attendance_matrix.get(student_id, {}).get(date, "Not Recorded")
+
+                        if new_status != old_status and new_status != "Not Recorded":
+                            if student_id not in attendance_updates:
+                                attendance_updates[student_id] = {}
+                            attendance_updates[student_id][date] = new_status
+                            changes_made = True
+
+                if changes_made:
+                    update_attendance_matrix(attendance_updates)
+                    st.success("✅ Attendance records updated successfully!")
+                    st.rerun()
+                else:
+                    st.info("No changes detected.")
+
+            # Quick actions
+            st.subheader("Quick Actions")
+            col1, col2, col3, col4 = st.columns(4)
+
+            with col1:
+                if st.button("Mark All Present for Selected Dates"):
+                    attendance_updates = {}
+                    for student in students:
+                        student_id = student[0]
+                        for date in date_range:
+                            if attendance_matrix.get(student_id, {}).get(date, "Not Recorded") != "Present":
+                                if student_id not in attendance_updates:
+                                    attendance_updates[student_id] = {}
+                                attendance_updates[student_id][date] = "Present"
+                    if attendance_updates:
+                        update_attendance_matrix(attendance_updates)
+                        st.success("All students marked as Present!")
+                        st.rerun()
+
+            with col2:
+                if st.button("Mark All Absent for Selected Dates"):
+                    attendance_updates = {}
+                    for student in students:
+                        student_id = student[0]
+                        for date in date_range:
+                            if attendance_matrix.get(student_id, {}).get(date, "Not Recorded") != "Absent":
+                                if student_id not in attendance_updates:
+                                    attendance_updates[student_id] = {}
+                                attendance_updates[student_id][date] = "Absent"
+                    if attendance_updates:
+                        update_attendance_matrix(attendance_updates)
+                        st.success("All students marked as Absent!")
+                        st.rerun()
+
+            with col3:
+                if st.button("Clear All for Selected Dates"):
+                    for student in students:
+                        student_id = student[0]
+                        for date in date_range:
+                            if student_id in attendance_matrix and date in attendance_matrix[student_id]:
+                                delete_attendance_by_student_date(student_id, date)
+                    st.success("All attendance records cleared for selected dates!")
                     st.rerun()
 
-        # Bulk actions
-        st.subheader("Bulk Actions")
-        col1, col2, col3 = st.columns(3)
+            with col4:
+                if st.button("📊 View Summary"):
+                    total_days = len(date_range)
+                    summary_data = []
+                    for student in students:
+                        student_id, name, grade = student
+                        present_count = 0
+                        absent_count = 0
+                        for date in date_range:
+                            status = attendance_matrix.get(student_id, {}).get(date, "Not Recorded")
+                            if status == "Present":
+                                present_count += 1
+                            elif status == "Absent":
+                                absent_count += 1
 
-        with col1:
-            if st.button("Mark All Present"):
-                for student in students:
-                    student_id = student[0]
-                    if existing_attendance.get(student_id) != "Present":
-                        if student_id in existing_attendance:
-                            # Update existing
-                            attendance_records = get_attendance()
-                            attendance_id = None
-                            for record in attendance_records:
-                                if record[1] == student_id and record[2] == date_str:
-                                    attendance_id = record[0]
-                                    break
-                            if attendance_id:
-                                update_attendance(attendance_id, "Present")
-                        else:
-                            add_attendance(student_id, date_str, "Present")
-                st.success("All students marked as Present!")
-                st.rerun()
+                        attendance_rate = (present_count / total_days * 100) if total_days > 0 else 0
+                        summary_data.append({
+                            "Student": name,
+                            "Present": present_count,
+                            "Absent": absent_count,
+                            "Not Recorded": total_days - present_count - absent_count,
+                            "Attendance Rate": f"{attendance_rate:.1f}%"
+                        })
 
-        with col2:
-            if st.button("Mark All Absent"):
-                for student in students:
-                    student_id = student[0]
-                    if existing_attendance.get(student_id) != "Absent":
-                        if student_id in existing_attendance:
-                            # Update existing
-                            attendance_records = get_attendance()
-                            attendance_id = None
-                            for record in attendance_records:
-                                if record[1] == student_id and record[2] == date_str:
-                                    attendance_id = record[0]
-                                    break
-                            if attendance_id:
-                                update_attendance(attendance_id, "Absent")
-                        else:
-                            add_attendance(student_id, date_str, "Absent")
-                st.success("All students marked as Absent!")
-                st.rerun()
-
-        with col3:
-            if st.button("Clear All for Today"):
-                for student in students:
-                    student_id = student[0]
-                    if student_id in existing_attendance:
-                        delete_attendance_by_student_date(student_id, date_str)
-                st.success("All attendance records for today cleared!")
-                st.rerun()
+                    summary_df = pd.DataFrame(summary_data)
+                    st.dataframe(summary_df, use_container_width=True)
 
         # Individual record management (advanced)
         with st.expander("Advanced: Individual Record Management"):
